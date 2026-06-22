@@ -31,6 +31,7 @@ struct TodoItem {
     creation_date: u64,
     changed_date: u64,
     deletion_date: Option<u64>,
+    tags: Vec<String>,
 }
 
 impl TodoItem {
@@ -52,8 +53,10 @@ struct TodoApp {
     trashed_tasks: Vec<TodoItem>,
     input_title: String,
     input_description: String,
+    search_text: String,
     selected_id: Option<usize>,
     view_mode: ViewMode,
+    drag_source_id: Option<usize>,
 }
 
 impl TodoApp {
@@ -69,8 +72,10 @@ impl TodoApp {
             trashed_tasks,
             input_title: String::new(),
             input_description: String::new(),
+            search_text: String::new(),
             selected_id: None,
             view_mode: ViewMode::List,
+            drag_source_id: None,
         }
     }
 }
@@ -144,20 +149,28 @@ impl TodoApp {
             ui.label("Description:");
             ui.text_edit_singleline(&mut self.input_description);
         });
+        ui.horizontal(|ui| {
+            ui.label("Search:");
+            ui.text_edit_singleline(&mut self.search_text);
+        });
         ui.add_space(10.0);
         if ui.add_sized([100.0, 35.0], egui::Button::new("Create")).clicked() {
             if !self.input_title.is_empty() {
                 let now = current_timestamp();
-                if let Ok(id) = database::insert_todo(&self.conn, &self.input_title, &self.input_description, now, now) {
+                let max_order = self.tasks.iter().map(|t| t.order_index).max().unwrap_or(-1);
+                if let Ok(id) = database::insert_todo(&self.conn, &self.input_title, &self.input_description, 3, max_order + 1, now, now) {
                     self.tasks.insert(0, TodoItem {
                         id,
                         title: self.input_title.clone(),
                         description: self.input_description.clone(),
                         completed: false,
                         readonly: false,
+                        priority: 3,
+                        order_index: max_order + 1,
                         creation_date: now,
                         changed_date: now,
                         deletion_date: None,
+                        tags: Vec::new(),
                     });
                 }
                 self.input_title.clear();
@@ -166,14 +179,26 @@ impl TodoApp {
         }
         ui.separator();
 
+        let search_lower = self.search_text.to_lowercase();
+        let filtered_tasks: Vec<&TodoItem> = self.tasks.iter()
+            .filter(|t| search_lower.is_empty() ||
+                t.title.to_lowercase().contains(&search_lower) ||
+                t.description.to_lowercase().contains(&search_lower))
+            .collect();
+
+        ui.label(format!("Showing {}/{} tasks", filtered_tasks.len(), self.tasks.len()));
+
         egui::ScrollArea::vertical().show(ui, |ui| {
-            for task in &self.tasks {
+            for task in &filtered_tasks {
                 ui.horizontal(|ui| {
-                    if ui.button(format!("View #{}", task.id)).clicked() {
+                    let drag_response = ui.add_sized([30.0, 24.0], egui::Label::new("☰").sense(egui::Sense::drag()));
+                    if drag_response.dragged() {
+                        self.drag_source_id = Some(task.id);
+                    }
+                    if ui.button(format!("#{} {}", task.priority_label(), task.title)).clicked() {
                         self.selected_id = Some(task.id);
                         self.view_mode = ViewMode::Detail;
                     }
-                    ui.label(&task.title);
                     if task.completed {
                         ui.label("✓");
                     }

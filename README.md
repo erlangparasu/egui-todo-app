@@ -6,12 +6,14 @@ A simple ToDo list application built with egui (Rust).
 
 - Create todo items (with priority P1-P5)
 - Edit todo items (disabled when readonly)
-- List todo items (shows priority, readonly status)
-- Show detail todo item (displays priority, readonly status)
+- List todo items (shows priority, readonly status, tags)
+- Show detail todo item (displays priority, readonly status, tags)
 - Delete todo items (soft delete)
 - Mark items as completed
 - Mark items as readonly (lock editing)
-- Reorder todo items (move up/down)
+- Reorder todo items (drag handle)
+- Tags support (add/remove tags as chips)
+- Search todo items (by title or description)
 - Trash menu with restore/permanent delete
 - Export database to file (native file dialog, cross-platform)
 
@@ -29,6 +31,19 @@ CREATE TABLE todos (
     creation_date INTEGER NOT NULL,
     changed_date INTEGER NOT NULL,
     deletion_date INTEGER
+);
+
+CREATE TABLE tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE todo_tags (
+    todo_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (todo_id, tag_id),
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 );
 ```
 
