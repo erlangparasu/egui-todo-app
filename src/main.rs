@@ -50,7 +50,8 @@ struct TodoApp {
 
 impl TodoApp {
     fn new() -> Self {
-        let conn = database::init_database("todo.db").expect("Failed to initialize database");
+        let db_path = database::get_db_path();
+        let conn = database::init_database(&db_path).expect("Failed to initialize database");
         let tasks = database::load_active_todos(&conn).expect("Failed to load todos");
         let trashed_tasks = database::load_trashed_todos(&conn).expect("Failed to load trashed todos");
 
@@ -97,8 +98,14 @@ impl eframe::App for TodoApp {
                     self.selected_id = None;
                 }
                 if ui.add_sized([80.0, 30.0], egui::Button::new("Export")).clicked() {
-                    if let Err(e) = database::export_database("todo.db", "todo_export.db") {
-                        eprintln!("Export failed: {}", e);
+                    if let Some(path) = rfd::FileDialog::new()
+                        .set_file_name("todo_export.db")
+                        .add_filter("SQLite Database", &["db"])
+                        .save_file()
+                    {
+                        if let Err(e) = database::export_database("todo.db", path.to_str().unwrap_or("todo_export.db")) {
+                            eprintln!("Export failed: {}", e);
+                        }
                     }
                 }
             });
@@ -171,18 +178,24 @@ impl TodoApp {
     }
 
     fn show_detail_view(&mut self, ui: &mut egui::Ui, id: usize) {
-        if let Some(task) = self.tasks.iter().find(|t| t.id == id) {
+        let task_opt = self.tasks.iter().find(|t| t.id == id).cloned();
+
+        if let Some(task) = task_opt {
             ui.label(format!("ID: {}", task.id));
             ui.label(format!("Title: {}", task.title));
             ui.label(format!("Description: {}", task.description));
             ui.label(format!("Status: {}", if task.completed { "Completed" } else { "Pending" }));
+            ui.label(format!("Readonly: {}", if task.readonly { "Yes 🔒" } else { "No" }));
             ui.label(format!("Created: {}", format_date(task.creation_date)));
             ui.label(format!("Changed: {}", format_date(task.changed_date)));
             ui.separator();
 
+            let is_readonly = task.readonly;
+
             ui.horizontal(|ui| {
-                if ui.add_sized([80.0, 35.0], egui::Button::new("Edit")).clicked() {
-                    self.view_mode = ViewMode::Edit;
+                if ui.add_sized([80.0, 35.0], egui::Button::new("Back")).clicked() {
+                    self.view_mode = ViewMode::List;
+                    self.selected_id = None;
                 }
                 if ui.add_sized([100.0, 35.0], egui::Button::new("Toggle Done")).clicked() {
                     if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
@@ -190,16 +203,6 @@ impl TodoApp {
                         let now = current_timestamp();
                         if database::toggle_todo(&self.conn, id, new_completed, now).is_ok() {
                             t.completed = new_completed;
-                            t.changed_date = now;
-                        }
-                    }
-                }
-                if ui.add_sized([100.0, 35.0], egui::Button::new("Toggle RO")).clicked() {
-                    if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
-                        let new_readonly = !t.readonly;
-                        let now = current_timestamp();
-                        if database::set_readonly(&self.conn, id, new_readonly, now).is_ok() {
-                            t.readonly = new_readonly;
                             t.changed_date = now;
                         }
                     }
@@ -215,9 +218,20 @@ impl TodoApp {
                         self.view_mode = ViewMode::List;
                     }
                 }
-                if ui.add_sized([80.0, 35.0], egui::Button::new("Back")).clicked() {
-                    self.view_mode = ViewMode::List;
-                    self.selected_id = None;
+                if ui.add_sized([100.0, 35.0], egui::Button::new("Toggle RO")).clicked() {
+                    if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
+                        let new_readonly = !t.readonly;
+                        let now = current_timestamp();
+                        if database::set_readonly(&self.conn, id, new_readonly, now).is_ok() {
+                            t.readonly = new_readonly;
+                            t.changed_date = now;
+                        }
+                    }
+                }
+                if !is_readonly {
+                    if ui.add_sized([80.0, 35.0], egui::Button::new("Edit")).clicked() {
+                        self.view_mode = ViewMode::Edit;
+                    }
                 }
             });
         } else {

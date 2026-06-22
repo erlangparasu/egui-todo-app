@@ -130,3 +130,7 @@ pub fn export_database(db_path: &str, export_path: &str) -> std::io::Result<()> 
     std::fs::copy(db_path, export_path)?;
     Ok(())
 }
+
+pub fn get_db_path() -> String {
+    "todo.db".to_string()
+}

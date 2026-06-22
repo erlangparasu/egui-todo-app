@@ -5,14 +5,14 @@ A simple ToDo list application built with egui (Rust).
 ## Features
 
 - Create todo items
-- Edit todo items
+- Edit todo items (disabled when readonly)
 - List todo items
-- Show detail todo item
+- Show detail todo item (displays readonly status)
 - Delete todo items (soft delete)
 - Mark items as completed
 - Mark items as readonly (lock editing)
 - Trash menu with restore/permanent delete
-- Export database to file
+- Export database to file (native file dialog, cross-platform)
 
 ## Database Schema
 
