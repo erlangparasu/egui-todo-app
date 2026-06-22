@@ -9,11 +9,13 @@ A simple ToDo list application built with egui (Rust).
 - List todo items (shows priority, readonly status, tags)
 - Show detail todo item (displays priority, readonly status, tags)
 - Delete todo items (soft delete)
-- Mark items as completed
-- Mark items as readonly (lock editing)
+- Mark items as completed (dynamic "Mark Done"/"Mark Pending" button)
+- Mark items as readonly (dynamic "Lock"/"Unlock" button)
 - Reorder todo items (^ and v buttons in list view)
-- Tags support (add/remove tags as chips)
-- Search todo items (by title or description)
+- Tags support (add/remove tags as chips, only used tags shown in filter)
+- Filter by tags (checkbox filters, only shows tags assigned to at least one active todo)
+- Search todo items (by title or description, combined with tag filters)
+- Change priority in detail view (dropdown, disabled when readonly)
 - Trash menu with restore/permanent delete
 - Export database to file (native file dialog, cross-platform)
 

@@ -54,7 +54,11 @@ struct TodoApp {
     trashed_tasks: Vec<TodoItem>,
     input_title: String,
     input_description: String,
+    input_tag: String,
+    input_priority: u8,
     search_text: String,
+    selected_tags: Vec<String>,
+    all_tags: Vec<String>,
     selected_id: Option<usize>,
     view_mode: ViewMode,
     drag_source_id: Option<usize>,
@@ -66,6 +70,7 @@ impl TodoApp {
         let conn = database::init_database(&db_path).expect("Failed to initialize database");
         let tasks = database::load_active_todos(&conn).expect("Failed to load todos");
         let trashed_tasks = database::load_trashed_todos(&conn).expect("Failed to load trashed todos");
+        let all_tags = database::get_used_tags(&conn).unwrap_or_default();
 
         Self {
             conn,
@@ -73,11 +78,19 @@ impl TodoApp {
             trashed_tasks,
             input_title: String::new(),
             input_description: String::new(),
+            input_tag: String::new(),
+            input_priority: 3,
             search_text: String::new(),
+            selected_tags: Vec::new(),
+            all_tags,
             selected_id: None,
             view_mode: ViewMode::List,
             drag_source_id: None,
         }
+    }
+
+    fn refresh_tags(&mut self) {
+        self.all_tags = database::get_used_tags(&self.conn).unwrap_or_default();
     }
 }
 
@@ -151,22 +164,30 @@ impl TodoApp {
             ui.text_edit_singleline(&mut self.input_description);
         });
         ui.horizontal(|ui| {
-            ui.label("Search:");
-            ui.text_edit_singleline(&mut self.search_text);
+            ui.label("Priority:");
+            egui::ComboBox::from_id_salt("priority_select")
+                .selected_text(format!("P{}", self.input_priority))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.input_priority, 1, "P1");
+                    ui.selectable_value(&mut self.input_priority, 2, "P2");
+                    ui.selectable_value(&mut self.input_priority, 3, "P3");
+                    ui.selectable_value(&mut self.input_priority, 4, "P4");
+                    ui.selectable_value(&mut self.input_priority, 5, "P5");
+                });
         });
         ui.add_space(10.0);
         if ui.add_sized([100.0, 35.0], egui::Button::new("Create")).clicked() {
             if !self.input_title.is_empty() {
                 let now = current_timestamp();
                 let max_order = self.tasks.iter().map(|t| t.order_index).max().unwrap_or(-1);
-                if let Ok(id) = database::insert_todo(&self.conn, &self.input_title, &self.input_description, 3, max_order + 1, now, now) {
+                if let Ok(id) = database::insert_todo(&self.conn, &self.input_title, &self.input_description, self.input_priority, max_order + 1, now, now) {
                     self.tasks.insert(0, TodoItem {
                         id,
                         title: self.input_title.clone(),
                         description: self.input_description.clone(),
                         completed: false,
                         readonly: false,
-                        priority: 3,
+                        priority: self.input_priority,
                         order_index: max_order + 1,
                         creation_date: now,
                         changed_date: now,
@@ -180,11 +201,40 @@ impl TodoApp {
         }
         ui.separator();
 
+        ui.horizontal(|ui| {
+            ui.label("Search:");
+            ui.text_edit_singleline(&mut self.search_text);
+        });
+
+        if !self.all_tags.is_empty() {
+            ui.label("Filter by tags:");
+            ui.push_id("tag_filter_scroll", |ui| {
+                egui::ScrollArea::horizontal().show(ui, |ui| {
+                    for tag in &self.all_tags {
+                        let mut selected = self.selected_tags.contains(tag);
+                        if ui.checkbox(&mut selected, tag).changed() {
+                            if selected {
+                                self.selected_tags.push(tag.clone());
+                            } else {
+                                self.selected_tags.retain(|t| t != tag);
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
         let search_lower = self.search_text.to_lowercase();
+        let selected_tags_clone = self.selected_tags.clone();
         let filtered_tasks: Vec<&TodoItem> = self.tasks.iter()
-            .filter(|t| search_lower.is_empty() ||
-                t.title.to_lowercase().contains(&search_lower) ||
-                t.description.to_lowercase().contains(&search_lower))
+            .filter(|t| {
+                let matches_search = search_lower.is_empty()
+                    || t.title.to_lowercase().contains(&search_lower)
+                    || t.description.to_lowercase().contains(&search_lower);
+                let matches_tags = selected_tags_clone.is_empty()
+                    || selected_tags_clone.iter().any(|st| t.tags.contains(st));
+                matches_search && matches_tags
+            })
             .collect();
 
         ui.label(format!("Showing {}/{} tasks", filtered_tasks.len(), self.tasks.len()));
@@ -226,23 +276,84 @@ impl TodoApp {
         let task_opt = self.tasks.iter().find(|t| t.id == id).cloned();
 
         if let Some(task) = task_opt {
+            let is_readonly = task.readonly;
+
             ui.label(format!("ID: {}", task.id));
             ui.label(format!("Title: {}", task.title));
             ui.label(format!("Description: {}", task.description));
             ui.label(format!("Status: {}", if task.completed { "Completed" } else { "Pending" }));
+            ui.horizontal(|ui| {
+                ui.label("Priority:");
+                if is_readonly {
+                    ui.label(format!("P{}", task.priority));
+                } else {
+                    let mut priority = task.priority;
+                    egui::ComboBox::from_id_salt(format!("priority_detail_{}", id))
+                        .selected_text(format!("P{}", priority))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut priority, 1, "P1");
+                            ui.selectable_value(&mut priority, 2, "P2");
+                            ui.selectable_value(&mut priority, 3, "P3");
+                            ui.selectable_value(&mut priority, 4, "P4");
+                            ui.selectable_value(&mut priority, 5, "P5");
+                        });
+                    if priority != task.priority {
+                        if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
+                            let now = current_timestamp();
+                            if database::update_priority(&self.conn, id, priority, now).is_ok() {
+                                t.priority = priority;
+                                t.changed_date = now;
+                            }
+                        }
+                    }
+                }
+            });
             ui.label(format!("Readonly: {}", if task.readonly { "Yes 🔒" } else { "No" }));
             ui.label(format!("Created: {}", format_date(task.creation_date)));
             ui.label(format!("Changed: {}", format_date(task.changed_date)));
+            ui.label("Tags:");
+            let tags_clone = task.tags.clone();
+            for tag in &tags_clone {
+                ui.horizontal(|ui| {
+                    ui.label(format!("[{}]", tag));
+                    if !is_readonly {
+                        if ui.add_sized([20.0, 20.0], egui::Button::new("x").small()).clicked() {
+                            if database::remove_tag(&self.conn, id, tag).is_ok() {
+                                if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
+                                    t.tags.retain(|x| x != tag);
+                                }
+                                self.refresh_tags();
+                            }
+                        }
+                    }
+                });
+            }
+            if !is_readonly {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.text_edit_singleline(&mut self.input_tag);
+                    if ui.add_sized([60.0, 30.0], egui::Button::new("Add Tag")).clicked() {
+                        if !self.input_tag.is_empty() {
+                            if database::add_tag(&self.conn, id, &self.input_tag).is_ok() {
+                                if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
+                                    t.tags.push(self.input_tag.trim().to_lowercase());
+                                }
+                                self.refresh_tags();
+                            }
+                            self.input_tag.clear();
+                        }
+                    }
+                });
+            }
             ui.separator();
-
-            let is_readonly = task.readonly;
 
             ui.horizontal(|ui| {
                 if ui.add_sized([80.0, 35.0], egui::Button::new("Back")).clicked() {
                     self.view_mode = ViewMode::List;
                     self.selected_id = None;
                 }
-                if ui.add_sized([100.0, 35.0], egui::Button::new("Toggle Done")).clicked() {
+                let done_button_text = if task.completed { "Mark Pending" } else { "Mark Done" };
+                if ui.add_sized([100.0, 35.0], egui::Button::new(done_button_text)).clicked() {
                     if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
                         let new_completed = !t.completed;
                         let now = current_timestamp();
@@ -263,7 +374,8 @@ impl TodoApp {
                         self.view_mode = ViewMode::List;
                     }
                 }
-                if ui.add_sized([100.0, 35.0], egui::Button::new("Toggle RO")).clicked() {
+                let ro_button_text = if task.readonly { "Unlock" } else { "Lock" };
+                if ui.add_sized([100.0, 35.0], egui::Button::new(ro_button_text)).clicked() {
                     if let Some(t) = self.tasks.iter_mut().find(|t| t.id == id) {
                         let new_readonly = !t.readonly;
                         let now = current_timestamp();

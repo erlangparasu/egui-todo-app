@@ -160,6 +160,34 @@ pub fn set_readonly(conn: &Connection, id: usize, readonly: bool, changed_date: 
     Ok(())
 }
 
+pub fn update_priority(conn: &Connection, id: usize, priority: u8, changed_date: u64) -> Result<()> {
+    conn.execute(
+        "UPDATE todos SET priority = ?1, changed_date = ?2 WHERE id = ?3",
+        rusqlite::params![priority, changed_date, id],
+    )?;
+    Ok(())
+}
+
+pub fn get_all_tags(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare("SELECT name FROM tags ORDER BY name")?;
+    let tags = stmt.query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<String>>>()?;
+    Ok(tags)
+}
+
+pub fn get_used_tags(conn: &Connection) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT t.name FROM tags t
+         INNER JOIN todo_tags tt ON t.id = tt.tag_id
+         INNER JOIN todos d ON tt.todo_id = d.id
+         WHERE d.deletion_date IS NULL
+         ORDER BY t.name"
+    )?;
+    let tags = stmt.query_map([], |row| row.get(0))?
+        .collect::<Result<Vec<String>>>()?;
+    Ok(tags)
+}
+
 pub fn soft_delete_todo(conn: &Connection, id: usize, deletion_date: u64) -> Result<()> {
     conn.execute(
         "UPDATE todos SET deletion_date = ?1 WHERE id = ?2",

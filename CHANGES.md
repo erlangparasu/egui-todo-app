@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+## [v1.0.4] - 2026-06-22
+
+### Added
+
+#### Tag Filter System
+- **Tag Checkboxes** - Display used tags as checkboxes below Search bar
+- **Multi-tag Filtering** - Select multiple tags to filter tasks (OR logic)
+- **Used Tags Only** - Only tags assigned to at least one active todo are shown
+- **Dynamic Tag List** - Tag filter list refreshes when tags are added/removed
+- **Combined Filtering** - Tag filters work together with title/description search
+
+#### UI Improvements
+- **Dynamic Button Labels** - "Mark Done"/"Mark Pending" based on completion status
+- **Dynamic Lock Button** - "Lock"/"Unlock" based on readonly status
+- **Priority Dropdown in Detail View** - Change priority directly from detail view (disabled when readonly)
+- **Create Button Placement** - Create button placed immediately after Priority input
+- **ScrollArea ID Fix** - Added `ui.push_id` to prevent widget ID clashes
+
+### Changed
+
+#### Tag System
+- **Used Tags Only** - Tag filter now only shows tags that are assigned to at least one active todo
+- **get_used_tags Function** - New database function to fetch only used tags
+
+### Fixed
+
+- **Impl Block Structure** - Fixed nested impl block issue with Default trait
+- **ScrollArea ID Clash** - Fixed duplicate widget ID error for ScrollArea
+
 ## [v1.0.3] - 2026-06-22
 
 ### Added
@@ -54,7 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 #### Tags System
 - **Add Tags** - Attach multiple tags to todo items
-- **Remove Tags** - Remove tags from todo items (planned)
+- **Remove Tags** - Remove tags from todo items with x button
 - **Tag Display** - Tags shown as chips with x button for removal
 - **Tag Persistence** - Tags stored in separate `tags` and `todo_tags` tables
 - **Tag Autocomplete** - Tags are reused across todos
@@ -95,7 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 #### UI Improvements
-- Reordered detail view buttons: Back, Toggle Done, Delete, Toggle RO, Edit
+- Reordered detail view buttons: Back, Mark Done/Pending, Delete, Lock/Unlock, Edit
 - Edit button only visible when item is not readonly
 - Priority displayed as `#P{N}` format in list
 - Readonly status shown as "Yes 🔒" or "No" in detail view
