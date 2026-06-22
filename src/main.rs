@@ -2,6 +2,7 @@ mod database;
 
 use eframe::egui;
 use rusqlite::Connection;
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn current_timestamp() -> u64 {
@@ -188,21 +189,32 @@ impl TodoApp {
 
         ui.label(format!("Showing {}/{} tasks", filtered_tasks.len(), self.tasks.len()));
 
+        let task_ids: Vec<usize> = filtered_tasks.iter().map(|t| t.id).collect();
+        let task_id_to_info: std::collections::HashMap<usize, (String, bool, bool)> = filtered_tasks.iter()
+            .map(|t| (t.id, (t.priority_label(), t.completed, t.readonly)))
+            .collect();
+
         egui::ScrollArea::vertical().show(ui, |ui| {
-            for task in &filtered_tasks {
+            for task_id in task_ids {
+                let (priority_label, completed, readonly) = task_id_to_info[&task_id].clone();
+                let task_title = self.tasks.iter().find(|t| t.id == task_id).map(|t| t.title.clone()).unwrap_or_default();
                 ui.horizontal(|ui| {
-                    let drag_response = ui.add_sized([30.0, 24.0], egui::Label::new("☰").sense(egui::Sense::drag()));
-                    if drag_response.dragged() {
-                        self.drag_source_id = Some(task.id);
-                    }
-                    if ui.button(format!("#{} {}", task.priority_label(), task.title)).clicked() {
-                        self.selected_id = Some(task.id);
+                    ui.vertical(|ui| {
+                        if ui.add_sized([20.0, 18.0], egui::Button::new("^").small()).clicked() {
+                            self.move_task(task_id, -1);
+                        }
+                        if ui.add_sized([20.0, 18.0], egui::Button::new("v").small()).clicked() {
+                            self.move_task(task_id, 1);
+                        }
+                    });
+                    if ui.button(format!("#{} {}", priority_label, task_title)).clicked() {
+                        self.selected_id = Some(task_id);
                         self.view_mode = ViewMode::Detail;
                     }
-                    if task.completed {
+                    if completed {
                         ui.label("✓");
                     }
-                    if task.readonly {
+                    if readonly {
                         ui.label("🔒");
                     }
                 });
@@ -302,6 +314,31 @@ impl TodoApp {
                         self.view_mode = ViewMode::Detail;
                     }
                 });
+            }
+        }
+    }
+
+    fn move_task(&mut self, id: usize, direction: i32) {
+        if let Some(current_idx) = self.tasks.iter().position(|t| t.id == id) {
+            let new_idx = (current_idx as i32 + direction) as usize;
+            if new_idx < self.tasks.len() {
+                let new_order = self.tasks[new_idx].order_index;
+                let old_order = self.tasks[current_idx].order_index;
+                let other_id = self.tasks[new_idx].id;
+                let now = current_timestamp();
+
+                if database::update_order_index(&self.conn, id, new_order, now).is_ok() {
+                    let _ = database::update_order_index(&self.conn, other_id, old_order, now);
+                }
+
+                if let Some(task) = self.tasks.iter_mut().find(|t| t.id == id) {
+                    task.order_index = new_order;
+                }
+                if let Some(other) = self.tasks.iter_mut().find(|t| t.id == other_id) {
+                    other.order_index = old_order;
+                }
+
+                self.tasks.sort_by_key(|t| t.order_index);
             }
         }
     }

@@ -11,7 +11,7 @@ A simple ToDo list application built with egui (Rust).
 - Delete todo items (soft delete)
 - Mark items as completed
 - Mark items as readonly (lock editing)
-- Reorder todo items (drag handle)
+- Reorder todo items (^ and v buttons in list view)
 - Tags support (add/remove tags as chips)
 - Search todo items (by title or description)
 - Trash menu with restore/permanent delete

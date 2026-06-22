@@ -136,6 +136,14 @@ pub fn update_todo(conn: &Connection, id: usize, title: &str, description: &str,
     Ok(())
 }
 
+pub fn update_order_index(conn: &Connection, id: usize, order_index: i32, changed_date: u64) -> Result<()> {
+    conn.execute(
+        "UPDATE todos SET order_index = ?1, changed_date = ?2 WHERE id = ?3",
+        rusqlite::params![order_index, changed_date, id],
+    )?;
+    Ok(())
+}
+
 pub fn toggle_todo(conn: &Connection, id: usize, completed: bool, changed_date: u64) -> Result<()> {
     conn.execute(
         "UPDATE todos SET completed = ?1, changed_date = ?2 WHERE id = ?3",
