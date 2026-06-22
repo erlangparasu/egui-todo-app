@@ -12,6 +12,8 @@ pub fn init_database(db_path: &str) -> Result<Connection> {
             description TEXT,
             completed INTEGER DEFAULT 0,
             readonly INTEGER DEFAULT 0,
+            priority INTEGER DEFAULT 3,
+            order_index INTEGER DEFAULT 0,
             creation_date INTEGER NOT NULL,
             changed_date INTEGER NOT NULL,
             deletion_date INTEGER
@@ -24,8 +26,8 @@ pub fn init_database(db_path: &str) -> Result<Connection> {
 
 pub fn load_active_todos(conn: &Connection) -> Result<Vec<TodoItem>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, description, completed, readonly, creation_date, changed_date, deletion_date
-         FROM todos WHERE deletion_date IS NULL ORDER BY id DESC"
+        "SELECT id, title, description, completed, readonly, priority, order_index, creation_date, changed_date, deletion_date
+         FROM todos WHERE deletion_date IS NULL ORDER BY order_index ASC"
     )?;
 
     let todos = stmt.query_map([], |row| {
@@ -35,9 +37,11 @@ pub fn load_active_todos(conn: &Connection) -> Result<Vec<TodoItem>> {
             description: row.get(2)?,
             completed: row.get::<_, i32>(3)? != 0,
             readonly: row.get::<_, i32>(4)? != 0,
-            creation_date: row.get(5)?,
-            changed_date: row.get(6)?,
-            deletion_date: row.get(7)?,
+            priority: row.get(5)?,
+            order_index: row.get(6)?,
+            creation_date: row.get(7)?,
+            changed_date: row.get(8)?,
+            deletion_date: row.get(9)?,
         })
     })?
     .collect::<Result<Vec<_>>>()?;
@@ -47,7 +51,7 @@ pub fn load_active_todos(conn: &Connection) -> Result<Vec<TodoItem>> {
 
 pub fn load_trashed_todos(conn: &Connection) -> Result<Vec<TodoItem>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, description, completed, readonly, creation_date, changed_date, deletion_date
+        "SELECT id, title, description, completed, readonly, priority, order_index, creation_date, changed_date, deletion_date
          FROM todos WHERE deletion_date IS NOT NULL ORDER BY deletion_date DESC"
     )?;
 
@@ -58,9 +62,11 @@ pub fn load_trashed_todos(conn: &Connection) -> Result<Vec<TodoItem>> {
             description: row.get(2)?,
             completed: row.get::<_, i32>(3)? != 0,
             readonly: row.get::<_, i32>(4)? != 0,
-            creation_date: row.get(5)?,
-            changed_date: row.get(6)?,
-            deletion_date: row.get(7)?,
+            priority: row.get(5)?,
+            order_index: row.get(6)?,
+            creation_date: row.get(7)?,
+            changed_date: row.get(8)?,
+            deletion_date: row.get(9)?,
         })
     })?
     .collect::<Result<Vec<_>>>()?;

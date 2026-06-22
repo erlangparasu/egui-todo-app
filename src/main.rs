@@ -26,9 +26,17 @@ struct TodoItem {
     description: String,
     completed: bool,
     readonly: bool,
+    priority: u8,
+    order_index: i32,
     creation_date: u64,
     changed_date: u64,
     deletion_date: Option<u64>,
+}
+
+impl TodoItem {
+    fn priority_label(&self) -> String {
+        format!("P{}", self.priority)
+    }
 }
 
 enum ViewMode {
