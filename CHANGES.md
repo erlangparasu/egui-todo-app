@@ -4,7 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v1.0.3] - 2026-06-22
+
+### Added
+- CHANGES.md changelog file documenting all features
+
+### Infrastructure
+- GitHub Actions workflow for cross-platform builds
+  - Linux (x86_64-unknown-linux-gnu)
+  - macOS (x86_64-apple-darwin, aarch64-apple-darwin)
+  - Windows (x86_64-pc-windows-msvc)
+- fail-fast: false for independent platform builds
+
+## [v1.0.2] - 2026-06-22
+
+### Infrastructure
+- Fixed GitHub Actions rust action name (dtolnay/rust-action → dtolnay/rust-toolchain)
+
+## [v1.0.1] - 2026-06-22
+
+### Infrastructure
+- Initial GitHub Actions workflow setup
+
+## [v1.0.0] - 2026-06-22
 
 ### Added
 
@@ -56,28 +78,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Full Database Export** - Exports complete SQLite database file
 - Works on Windows, macOS, and Linux
 
-#### Database Schema
-- **todos table** - Main todo items storage
-  - id (PRIMARY KEY)
-  - title (TEXT NOT NULL)
-  - description (TEXT)
-  - completed (INTEGER DEFAULT 0)
-  - readonly (INTEGER DEFAULT 0)
-  - priority (INTEGER DEFAULT 3)
-  - order_index (INTEGER DEFAULT 0)
-  - creation_date (INTEGER NOT NULL)
-  - changed_date (INTEGER NOT NULL)
-  - deletion_date (INTEGER)
-
-- **tags table** - Tag definitions
-  - id (PRIMARY KEY)
-  - name (TEXT NOT NULL UNIQUE)
-
-- **todo_tags table** - Many-to-many relationship
-  - todo_id (FOREIGN KEY)
-  - tag_id (FOREIGN KEY)
-  - PRIMARY KEY (todo_id, tag_id)
-
 #### Date Tracking
 - **Creation Date** - Automatically set when item is created
 - **Changed Date** - Updated on any modification
@@ -102,47 +102,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Completion status shown as "✓" checkmark in list
 - Search input field added to list view
 
-#### Database Changes
-- Added `priority` column (INTEGER DEFAULT 3)
-- Added `order_index` column (INTEGER DEFAULT 0)
-- Created `tags` table for tag management
-- Created `todo_tags` junction table for many-to-many relationship
+### Database Schema
 
-### Fixed
+```sql
+CREATE TABLE todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    completed INTEGER DEFAULT 0,
+    readonly INTEGER DEFAULT 0,
+    priority INTEGER DEFAULT 3,
+    order_index INTEGER DEFAULT 0,
+    creation_date INTEGER NOT NULL,
+    changed_date INTEGER NOT NULL,
+    deletion_date INTEGER
+);
 
-- Borrow checker issues in move_task function
-- Closure capture issues in list view rendering
-- Unused imports and dead code warnings
+CREATE TABLE tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
 
-### Infrastructure
-
-#### GitHub Actions CI/CD
-- **Cross-platform builds** - Compiles for Windows, macOS, and Linux
-- **Multiple targets**:
-  - Linux: x86_64-unknown-linux-gnu
-  - macOS: x86_64-apple-darwin, aarch64-apple-darwin
-  - Windows: x86_64-pc-windows-msvc
-- **Fail-fast disabled** - Each platform builds independently
-- **Artifact upload** - Each build produces downloadable artifact
-- **Release creation** - Tags trigger automatic GitHub releases
-
-#### Project Structure
-```
-egui-todo-app/
-├── src/
-│   ├── main.rs          # Main application code
-│   └── database.rs      # SQLite database operations
-├── migrations/          # SQL migration files
-│   ├── 001_init.sql
-│   ├── 002_add_readonly.sql
-│   ├── 003_export_feature.sql
-│   └── 004_add_tags.sql
-├── .github/
-│   └── workflows/
-│       └── build.yml    # GitHub Actions workflow
-├── Cargo.toml           # Rust dependencies
-├── README.md           # Project documentation
-└── todo.db             # SQLite database (gitignored)
+CREATE TABLE todo_tags (
+    todo_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (todo_id, tag_id),
+    FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
 ```
 
 ### Dependencies
@@ -153,10 +140,18 @@ egui-todo-app/
 - **rusqlite 0.32** - SQLite bindings with bundled feature
 - **rfd 0.15** - Native file dialogs
 
-## Version History
+### Project Structure
 
-### v0.1.0 (Initial Release)
-- Basic CRUD operations
-- SQLite persistence
-- Soft delete with trash
-- Export database feature
+```
+egui-todo-app/
+├── src/
+│   ├── main.rs          # Main application code
+│   └── database.rs      # SQLite database operations
+├── migrations/          # SQL migration files
+├── .github/
+│   └── workflows/
+│       └── build.yml    # GitHub Actions workflow
+├── Cargo.toml           # Rust dependencies
+├── README.md           # Project documentation
+└── CHANGES.md          # Changelog
+```
